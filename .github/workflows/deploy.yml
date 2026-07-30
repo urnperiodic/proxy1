@@ -6,8 +6,22 @@ on:
       - main
   workflow_dispatch:
 
+# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages and branch push
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+# Allow one concurrent deployment
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
 jobs:
-  build:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
 
     steps:
@@ -21,55 +35,52 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
-      # 3. Cache Cargo binaries to speed up subsequent runs
-      - name: Cache Cargo Binaries
-        uses: actions/cache@v4
+      # 3. Setup Rewriter Toolchain (wasm-bindgen, binaryen, wasm-snip)
+      - name: Setup Rewriter Toolchain
+        uses: ./.github/actions/setup-rewriter-toolchain
         with:
-          path: ~/.cargo/bin
-          key: ${{ runner.os }}-cargo-bin-v1
+          wasm-bindgen-version: "0.2.105"
+          rewriter-path: packages/core/rewriter
+          github-token: ${{ github.token }}
 
-      # 4. Install Rust-specific compilation tools
-      - name: Install Rust WASM Dependencies
-        run: |
-          if ! command -v wasm-bindgen &> /dev/null; then
-            cargo install wasm-bindgen-cli
-          fi
-          if ! cargo install --list | grep -q "wasm-snip"; then
-            cargo install --git https://github.com
-          fi
-
-      # 5. Set up Node.js
+      # 4. Set up Node.js
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: "npm"
 
-      # 6. Install pnpm globally and install wasm-opt wrapper
-      - name: Install pnpm & Global npm Tools
-        run: |
-          npm install -g pnpm wasm-opt
-
-      # 7. Install Scramjet package dependencies
+      # 5. Install Scramjet package dependencies
       - name: Install Dependencies
-        run: pnpm install
+        run: npm install
 
-      # 8. Compile the WebAssembly Rewriter Core
+      # 6. Compile the WebAssembly Rewriter Core
       - name: Build WASM Rewriter
         run: |
           cd packages/core
-          pnpm rewriter:build
+          npm run rewriter:build
 
-      # 9. Build final production application assets
-      - name: Build Scramjet
+      # 7. Build Scramjet Packages and Demo Frontend
+      - name: Build Project
         run: |
-          cd packages/core
-          pnpm build
+          npx rspack build --mode production --config-name scramjet-iife --config-name scramjet-iife-bundled --config-name scramjet-esmodule --config-name scramjet-esmodule-bundled --config-name scramjet-types --config-name scramjet-controller --config-name scramjet-utils-iife --config-name scramjet-utils-esmodule --config-name scramjet-bootstrap --config-name scramjet-bootstrap-static --config-name create-proxy-app
+          cd packages/demo
+          npm run build
 
-      # 10. Archive the built files for deployment
-      - name: Upload Build Artifacts
-        uses: actions/upload-artifact@v4
+      # 8. Upload artifact for modern GitHub Pages
+      - name: Upload Pages Artifact
+        uses: actions/upload-pages-artifact@v3
         with:
-          name: scramjet-build
-          path: |
-            packages/core/dist
-            packages/core/build
+          path: packages/demo/dist
+
+      # 9. Deploy to modern GitHub Pages
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+      # 10. Backup Deploy to gh-pages branch (supports classic branch-based Pages)
+      - name: Deploy to gh-pages branch
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: packages/demo/dist
