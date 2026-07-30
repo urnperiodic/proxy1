@@ -43,43 +43,45 @@ jobs:
           rewriter-path: packages/core/rewriter
           github-token: ${{ github.token }}
 
-      # 4. Set up Node.js
+      # 4. Setup pnpm
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      # 5. Set up Node.js
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: "24"
+          cache: "pnpm"
 
-      # 5. Install Scramjet package dependencies
+      # 6. Install Scramjet package dependencies
       - name: Install Dependencies
-        run: npm install
+        run: pnpm install
 
-      # 6. Compile the WebAssembly Rewriter Core
+      # 7. Compile the WebAssembly Rewriter Core
       - name: Build WASM Rewriter
         run: |
           cd packages/core
-          npm run rewriter:build
+          pnpm rewriter:build
 
-      # 7. Build Scramjet Packages and Demo Frontend
+      # 8. Build Scramjet Packages and Demo Frontend
       - name: Build Project
-        run: |
-          npx rspack build --mode production --config-name scramjet-iife --config-name scramjet-iife-bundled --config-name scramjet-esmodule --config-name scramjet-esmodule-bundled --config-name scramjet-types --config-name scramjet-controller --config-name scramjet-utils-iife --config-name scramjet-utils-esmodule --config-name scramjet-bootstrap --config-name scramjet-bootstrap-static --config-name create-proxy-app
-          cd packages/demo
-          npm run build
+        run: pnpm build
 
-      # 8. Upload artifact for modern GitHub Pages
+      # 9. Upload artifact for modern GitHub Pages
       - name: Upload Pages Artifact
         uses: actions/upload-pages-artifact@v3
         continue-on-error: true
         with:
           path: packages/demo/dist
 
-      # 9. Deploy to modern GitHub Pages
+      # 10. Deploy to modern GitHub Pages
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
         continue-on-error: true
 
-      # 10. Backup Deploy to gh-pages branch (supports classic branch-based Pages)
+      # 11. Backup Deploy to gh-pages branch (supports classic branch-based Pages)
       - name: Deploy to gh-pages branch
         uses: peaceiris/actions-gh-pages@v4
         continue-on-error: true

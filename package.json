@@ -3,6 +3,7 @@
 	"version": "1.0.0",
 	"description": "",
 	"type": "module",
+	"packageManager": "pnpm@9.15.4",
 	"keywords": [],
 	"author": "Mercury Workshop",
 	"license": "AGPL-3.0-only",

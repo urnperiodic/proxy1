@@ -8,13 +8,23 @@ import chalk from "chalk";
 import { createServer } from "vite";
 import { WebSocketServer } from "ws";
 
+// Helper to safely log socket/WebSocket errors without triggering automated error warnings on benign client disconnects
+const handleSocketError = (context: string, err: any) => {
+	const code = err?.code;
+	if (code === "ECONNRESET" || code === "EPIPE" || code === "ETIMEDOUT") {
+		console.log(`[Socket info] ${context} (client disconnected): ${err.message || err}`);
+	} else {
+		console.error(`${context}:`, err);
+	}
+};
+
 // Monkey-patch WebSocketServer handleUpgrade to intercept upgraded WebSockets
 // and attach an error handler to prevent crashing the server on client network errors/frame issues
 const originalHandleUpgrade = WebSocketServer.prototype.handleUpgrade;
 WebSocketServer.prototype.handleUpgrade = function (this: any, request: any, socket: any, head: any, callback: any) {
 	return originalHandleUpgrade.call(this, request, socket, head, (ws: any, ...args: any[]) => {
 		ws.on("error", (err: any) => {
-			console.error("Multiplexed upgraded WebSocket connection error:", err);
+			handleSocketError("Multiplexed upgraded WebSocket connection error", err);
 		});
 		return callback(ws, ...args);
 	});
@@ -69,7 +79,7 @@ wisp.options.allow_loopback_ips = true;
 
 wispserver.on("upgrade", (req, socket, head) => {
 	socket.on("error", (err) => {
-		console.error("Wispserver upgrade socket error:", err);
+		handleSocketError("Wispserver upgrade socket error", err);
 	});
 	try {
 		wisp.routeRequest(req, socket, head);
@@ -103,7 +113,7 @@ for (const listener of originalUpgradeListeners) {
 
 server.httpServer?.on("upgrade", (req, socket, head) => {
 	socket.on("error", (err) => {
-		console.error("Multiplexed upgrade socket error:", err);
+		handleSocketError("Multiplexed upgrade socket error", err);
 	});
 
 	const isViteHmr = req.headers["sec-websocket-protocol"] === "vite-hmr";
