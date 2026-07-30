@@ -1,0 +1,75 @@
+name: Build and Deploy Scramjet
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Check out the repository along with its submodules
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      # 2. Install Rust toolchain
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      # 3. Cache Cargo binaries to speed up subsequent runs
+      - name: Cache Cargo Binaries
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin
+          key: ${{ runner.os }}-cargo-bin-v1
+
+      # 4. Install Rust-specific compilation tools
+      - name: Install Rust WASM Dependencies
+        run: |
+          if ! command -v wasm-bindgen &> /dev/null; then
+            cargo install wasm-bindgen-cli
+          fi
+          if ! cargo install --list | grep -q "wasm-snip"; then
+            cargo install --git https://github.com
+          fi
+
+      # 5. Set up Node.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # 6. Install pnpm globally and install wasm-opt wrapper
+      - name: Install pnpm & Global npm Tools
+        run: |
+          npm install -g pnpm wasm-opt
+
+      # 7. Install Scramjet package dependencies
+      - name: Install Dependencies
+        run: pnpm install
+
+      # 8. Compile the WebAssembly Rewriter Core
+      - name: Build WASM Rewriter
+        run: |
+          cd packages/core
+          pnpm rewriter:build
+
+      # 9. Build final production application assets
+      - name: Build Scramjet
+        run: |
+          cd packages/core
+          pnpm build
+
+      # 10. Archive the built files for deployment
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: scramjet-build
+          path: |
+            packages/core/dist
+            packages/core/build
