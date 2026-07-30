@@ -48,7 +48,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: "npm"
 
       # 5. Install Scramjet package dependencies
       - name: Install Dependencies
@@ -70,6 +69,7 @@ jobs:
       # 8. Upload artifact for modern GitHub Pages
       - name: Upload Pages Artifact
         uses: actions/upload-pages-artifact@v3
+        continue-on-error: true
         with:
           path: packages/demo/dist
 
@@ -77,10 +77,12 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+        continue-on-error: true
 
       # 10. Backup Deploy to gh-pages branch (supports classic branch-based Pages)
       - name: Deploy to gh-pages branch
         uses: peaceiris/actions-gh-pages@v4
+        continue-on-error: true
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: packages/demo/dist
